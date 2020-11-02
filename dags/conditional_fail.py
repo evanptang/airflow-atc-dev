@@ -23,7 +23,7 @@ args = {
 
 dag = DAG(
     'conditional_fail',
-    schedule_interval='0 7 * * *', 
+    schedule_interval='0 * * * *', 
     default_args=args
 )
 

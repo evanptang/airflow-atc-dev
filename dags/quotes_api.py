@@ -26,7 +26,7 @@ args = {
 
 dag = DAG(
     'quotes_api',
-    schedule_interval='0 7 * * *', 
+    schedule_interval='0 * * * *', 
     default_args=args
 )
 

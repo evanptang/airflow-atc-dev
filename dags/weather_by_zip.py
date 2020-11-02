@@ -26,7 +26,7 @@ args = {
 
 dag = DAG(
     'weather_by_zip', 
-    schedule_interval='0 4 * * *',
+    schedule_interval='0 * * * *',
     default_args=args
 ) 
 

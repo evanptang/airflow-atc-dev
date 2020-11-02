@@ -27,7 +27,7 @@ args = {
 
 dag = DAG(
     'covid_data_by_country',
-    schedule_interval='0 7 * * *', 
+    schedule_interval='0 * * * *', 
     default_args=args
 )
 
