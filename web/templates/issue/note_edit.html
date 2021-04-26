@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<script>
+  $(document ).ready(function() {
+    $("span[id^='reason']").each(function (i, el){
+      $.get(`/api/query/queryAction/?id=${el.id}`, function(data) {
+          $(el).text(data.option)
+      });
+    });
+    $("span[id^='notes']").each(function (i, el){
+      $.get(`/api/query/queryNotesByIssueId/?id=${el.id}`, function(data) {
+          $(el).text(data.notes);
+      });
+    });
+    if ('{{user.username}}' !==  '{{object.response_by}}'){
+      $("#id_investigator_resolved").prop('disabled', true);
+    }
+    if ('{{user.reporter}}' !==  '{{object.response_by}}'){
+      $("#id_assignee_resolved").prop('disabled', true);
+    }
+  });
+</script>
+  <h1>Edit</h1>
+  <br>
+  <h5>Initial Information:</h5>
+  <p><strong>Dag ID: </strong>{{object.dag_id}}</p>
+  <p><strong>Task ID: </strong>{{object.first_failed_task}}</p>
+  <p><strong>Execution Datetime: </strong>{{object.execution_datetime}}</p>
+  <br>
+  <h5>Reporter:</h5>
+  <p><strong>Reporter: </strong>{{object.reporter}}</p>
+  <p><strong>Response Time: </strong>{{object.etl_ingestion_time}}</p>
+  <p><strong>Action:</strong> <span id="reason_{{object.issue_id}}"></span></p>
+  <p><strong>Reporter Notes:</strong> <span id="notes_{{object.issue_id}}"></span></p>
+  <br>
+  <h5>Additional Information:</h5>
+  <p><strong>Investigator: </strong>{{object.response_by}}</p>
+  <p><strong>Issue Id: </strong>{{object.issue_id}}</p>
+  <br>
+  <h5>Form:</h5>
+  <form action="" method="post">{% csrf_token %}
+    {{ form.as_p }}
+    <a type="button" class="btn btn-outline-danger" href="{% url 'post_detail' object.issue_id %}">
+      Go Back
+    </a>
+    <button class="btn btn-info ml-2" type="submit">Update</button>
+  </form>
+{% endblock content %}

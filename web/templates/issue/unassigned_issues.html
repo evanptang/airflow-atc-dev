@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  .ignore { color: green;}
+  .ignore { color: red;}
+</style>
+{% load static%}
+
+<script src="{% static 'issue/main.js' %}"></script>
+<script>
+    $(document).ready(function(){
+      $('[data-toggle="popover"]').popover();
+      $.get(`/api/query/getActions/?acknowledge=false`, function(data) {
+        let ignoreActions = data;
+        $("select[id^='form_ignore_']").each(function (i, el){
+          ignoreActions.forEach(function (item, index) {
+            $(el).append($(`<option value="${item.fields.value}">${item.fields.display_value}</option>`));
+          });
+        });
+      });
+      $.get(`/api/query/getActions/?acknowledge=true`, function(data) {
+        let activeActions = data;
+        $("select[id^='form_acknowledge_']").each(function (i, el){
+          activeActions.forEach(function (item, index) {
+            $(el).append($(`<option value="${item.fields.value}">${item.fields.display_value}</option>`));
+          });
+        });
+      });
+      $("button[id^='popover']").each(function (i, el){
+        let dagStart = el.id.replace("popover", "span_dag_start");
+        let dagTime = $(`#${dagStart}`).text();
+        let oldData = $(el).attr('data-content');
+        let newData = oldData;
+        $.get(`/api/query/calculateTimeDifference/?time=${dagTime}`, function(data){
+          if (data.status === 'success'){
+            newData = newData.replace('replaceWithTime', data.time_difference);
+            $(el).attr('data-content', newData);
+          };
+        });
+        $.get(`/api/query/groupByIssueId/?id=${el.id}`, function(data){
+          if (data.status === 'success'){
+            newData = newData.replace('replaceWithRunsMatched', data.count);
+            $(el).attr('data-content', newData);
+          };
+        });
+      });
+    });
+</script>
+<br>
+<h2>Unassigned Issues</h2>
+<div id="assign_alert" class="alert alert-primary alert-dismissible fade" role="alert" aria-hidden="true">
+  <span id="assign_alert_string"><strong>Issue Claimed</strong></span>
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+<div class="btn-toolbar justify-content-between" role="toolbar" aria-label="Toolbar with button groups">
+  <form class="form-inline mt-2 mt-md-0" action="{% url 'unassigned_issues' %}" method="get">
+    <input name="q" class="form-control mr-sm-2" type="text" placeholder="Search" aria-label="Seach">
+    <a type="button" class="btn btn-outline-danger" href="{% url 'unassigned_issues' %}">Clear Search</a>
+  </form>
+  <div class="btn-group" role="group" aria-label="Select View">
+    <a type="button" href="{% url 'unassigned_issues' %}?q={{ request.GET.q|urlencode }}" class="btn btn-outline-secondary">All</a>
+    <a type="button" href="{% url 'unassigned_issues' %}?hourfilter=24&q={{ request.GET.q|urlencode }}" class="btn btn-outline-secondary">Last 24 Hours</a>
+    <a type="button" href="{% url 'unassigned_issues' %}?hourfilter=48&q={{ request.GET.q|urlencode }}" class="btn btn-outline-secondary">Last 48 Hours</a>
+  </div>
+</div>
+<br>
+  <table class="table table-sm table-bordered table-striped table-hover">
+    <div class="table-responsive">
+    <thead>
+      <td style ="word-break:break-all;">dag_id</td>
+      <td style ="word-break:break-all;">first_failed_task</td>
+      <td style ="word-break:break-all;">time</td>
+      <td>Acknowledge</td>
+      <td>Ignore</td>
+      <td>Details</td>
+      <td>Link</td>
+    </thead>
+    <tbody>
+      {% for post in object_list %}
+      <tr class="row_{{post.issue_id}}">
+          <td>{{post.dag_id |truncatechars:45}}</td>
+          <td style="overflow: hidden; text-overflow: ellipsis">{{post.first_failed_task |truncatechars:45}}</td>
+          <td>{{post.dag_start_datetime}}</td>
+          <td>
+            <form action="" method="post">{% csrf_token %}
+              <select 
+              class="form-control acknowledge" 
+              id='form_acknowledge_{{post.id}}' 
+              onChange="insertAirMarshallResponse(
+                'acknowledge', 
+                '{{post.id}}', 
+                '{{post.issue_id}}', 
+                this.value, 
+                '{{user.username}}', 
+                '{{post.dag_id}}', 
+                '{{post.first_failed_task}}');">
+                <option value="" disabled selected></option>
+              </select>
+            </form>
+          </td>
+          <td>
+            <form action="" method="post">{% csrf_token %}
+              <select 
+              class="form-control ignore" 
+              id='form_ignore_{{post.id}}'  
+              onChange="insertAirMarshallResponse(
+                'ignore', 
+                '{{post.id}}', 
+                '{{post.issue_id}}', 
+                this.value, 
+                '{{user.username}}', 
+                '{{post.dag_id}}', 
+                '{{post.first_failed_task}}');">
+                <option value="" disabled selected></option>
+              </select>
+            </form>
+          </td>
+          <td>
+            <button 
+              id="popover_{{post.issue_id}}"
+              tabindex="0"
+              role="button" 
+              class="btn btn-light" 
+              data-toggle="popover"
+              data-trigger="focus"
+              data-placement="top"
+              title="{{post.dag_id}}" 
+              data-content="Manual Execution: {{post.manual_boolean}} 
+              <br>Hourly Execution: {{post.repeated_dag_boolean}} 
+              <br>Expected Failure: {{post.whitelisted_boolean}} 
+              <br>Runs Matched: replaceWithRunsMatched
+              <br>SLA Disparity: replaceWithTime"
+              data-html="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-caret-up-square-fill" viewBox="0 0 16 16">
+                <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm4 9h8a.5.5 0 0 0 .374-.832l-4-4.5a.5.5 0 0 0-.748 0l-4 4.5A.5.5 0 0 0 4 11z"/>
+              </svg>
+            </button>
+          </td>
+          <td><button type="button" class="btn btn-primary" id='primary_{{post.id}}' onclick="openDagId('{{post.dag_id}}', '{{post.run_id}}');">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-right" viewBox="0 0 16 16">
+              <path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
+              <path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
+            </svg>
+          </button></td>
+          <span style="display: none;" id="span_dag_start_{{post.issue_id}}">{{post.dag_start_datetime|date:"c" }}</span>
+      </tr>
+      {% endfor %}
+    </tbody>
+    </div>
+  </table>
+  <div class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+            <a href="?page=1">&laquo; first</a>
+            <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+        {% endif %}
+    </span> 
+  </div>
+{% endblock content %}

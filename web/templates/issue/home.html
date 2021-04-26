@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Home{% endblock title %}
+
+{% block content %}
+  <br/>
+  <div class="jumbotron">
+    <h1 class="display-4">Air Traffic Control</h1>
+    <p class="lead">Rethinking Airflow Support</p>
+    <p class="lead">
+      <a class="btn btn-primary btn-lg" href="{% url 'unassigned_issues' %}"
+      role="button">View All Issues</a>
+    </p>
+  </div>
+{% endblock content %}

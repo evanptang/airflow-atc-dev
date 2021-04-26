@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="article-entry">
+    <h2>{{ object.value }}</h2>
+    <p>by {{ object.user_added }} | {{ object.datetime }}</p>
+    <p>{{ object.display_value }}</p>
+  </div>
+
+  <p><a href="{% url 'action_edit' article.pk %}">Edit</a> |
+    <a href="{% url 'action_delete' article.pk %}">Delete</a></p>
+  <p>Back to <a href="{% url 'action_list' %}">All Articles</a>.</p>
+{% endblock content %}

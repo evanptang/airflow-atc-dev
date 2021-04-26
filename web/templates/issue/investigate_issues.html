@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% load static%}
+
+<script src="{% static 'issue/main.js' %}"></script>
+<script>
+  $(document ).ready(function() {
+      $("span[id^='reason']").each(function (i, el){
+        $.get(`/api/query/queryAction/?id=${el.id}`, function(data) {
+            $(el).text(data.option)
+        });
+      });
+      $("span[id^='notes']").each(function (i, el){
+        $.get(`/api/query/queryNotesByIssueId/?id=${el.id}`, function(data) {
+            $(el).text(data.notes)
+        });
+      });
+    });
+</script>
+<br>
+<h2>Investigate Issues</h2>
+<div id="assign_alert" class="alert alert-info alert-dismissible fade" role="alert" aria-hidden="true">
+  <span id="assign_alert_string"><strong>Issue Removed From Ignored List</strong></span>
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+
+<div class="btn-toolbar justify-content-between" role="toolbar" aria-label="Toolbar with button groups">
+
+  <form class="form-inline mt-2 mt-md-0" action="{% url 'investigate' %}" method="get">
+    <input name="q" class="form-control mr-sm-2" type="text" placeholder="Search" aria-label="Seach">
+    <a type="button" class="btn btn-outline-danger" href="{% url 'investigate' %}">Clear Search</a>
+  </form>
+  <div class="btn-group" role="group" aria-label="Select View">
+    <a type="button" href="{% url 'investigate' %}?q={{ request.GET.q|urlencode }}" class="btn btn-outline-secondary">All</a>
+    <a type="button" href="{% url 'investigate' %}?hourfilter=24&q={{ request.GET.q|urlencode }}" class="btn btn-outline-secondary">Last 24 Hours</a>
+    <a type="button" href="{% url 'investigate' %}?hourfilter=48&q={{ request.GET.q|urlencode }}" class="btn btn-outline-secondary">Last 48 Hours</a>
+  </div>
+</div>
+<br>
+
+<br>
+<table class="table table-sm table-bordered table-striped table-hover">
+    <div class="table-responsive">
+    <thead>
+      <td style ="word-break:break-all;">dag_id</td>
+      <td style ="word-break:break-all;">task_id</td>
+      <td style ="word-break:break-all;">executed</td>
+      <td style ="word-break:break-all;">reporter</td>
+      <td style ="word-break:break-all;">reason</td>
+      <td>support notes</td>
+      <td>Details</td>
+    </thead>
+    <tbody>
+      {% for post in object_list %}
+      <tr class="row_{{post.issue_id}}">
+        <td><button type="button" class="btn btn-link" id='primary_{{post.id}}' onclick="openDagId('{{post.dag_id}}', '{{post.run_id}}');">
+          {{post.dag_id}}
+        </button></td>
+        <td>{{post.first_failed_task}}</td>
+        <td>{{post.execution_datetime}}</td>
+        <td>{{post.reporter}}</td>
+        <td><span id="reason_{{post.issue_id}}"></span></td>
+        <td><span id="notes_{{post.issue_id}}"></span></td>
+        <td>                
+          <a type="button" class="btn btn-outline-primary" href="{% url 'post_detail' post.issue_id %}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chat-right-dots-fill" viewBox="0 0 16 16">
+              <path d="M16 2a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9.586a1 1 0 0 1 .707.293l2.853 2.853a.5.5 0 0 0 .854-.353V2zM5 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 1a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+            </svg>
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+  </table>
+  <div class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+            <a href="?page=1">&laquo; first</a>
+            <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+        {% endif %}
+    </span> 
+  </div>
+{% endblock content %}

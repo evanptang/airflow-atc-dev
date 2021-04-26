@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% load static%}
+
+{% block content %}
+<script src="{% static 'insert/main.js' %}"></script>
+<script src="{% static 'issue/main.js' %}"></script>
+<script>
+    $(document ).ready(function() {
+        localStorage.setItem('assignBoolean', 'true');
+        $('[data-toggle="popover"]').popover();
+        $.get(`/api/query/queryUsers/?staff=true`, function(data){
+            let userList = data.response_by
+            let rowArrayAssigned = [];
+            $("select[id^='form_assignee']").each(function (i, el){
+                userList.forEach(function (item, index) {
+                    $(el).append($(`<option value="${item.username}">${item.first_name}</option>`));
+
+                });
+                $.get(`/api/query/queryNotesResponder/?id=${el.id}`, function(data) {
+                    if (data.response_by !== null) {
+                        var rowAssign = el.id.replace("form_assignee", "row");
+                        rowArrayAssigned.push(rowAssign);
+                        localStorage.setItem('rowAssigned', rowArrayAssigned);
+                        $(el).val(data.response_by);
+                        var checkAssign = el.id.replace("form_assignee", "switch");
+                        $(`#${checkAssign}`).attr('checked', 'checked');
+                        var removeAssign = el.id.replace("form_assignee", "remove_response");
+                        $(`#${removeAssign}`).attr("disabled", true);
+                        $('#assign_alert').addClass("show").addClass("alert-success").removeClass("alert-primary");
+                        $('#assign_alert_string').text("Page Ready")
+                        setTimeout(() => {  $('#assign_alert').removeClass("show").removeClass("alert-success").addClass("alert-primary"); }, 2000);              
+                    }
+                });
+            });
+        })
+        $.get(`/api/query/getActions/?acknowledge=true`, function(data) {
+            let activeActions = data;
+            $("select[id^='action_error_']").each(function (i, el){
+                activeActions.forEach(function (item, index) {
+                    $(el).append($(`<option value="${item.fields.value}">${item.fields.display_value}</option>`));
+                });
+                $.get(`/api/query/queryAction/?id=${el.id}`, function(data) {
+                    $(`#${el.id}`).val(data.option)
+                });
+            });
+        });
+    });
+</script>
+<br>
+<h2>To Assign</h2>
+<div id="assign_alert" class="alert alert-primary alert-dismissible fade" role="alert" aria-hidden="true">
+    <span id="assign_alert_string"><strong>Issue Assigned</strong></span>
+    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+      <span aria-hidden="true">&times;</span>
+    </button>
+</div>
+<div class="btn-toolbar justify-content-between" role="toolbar" aria-label="Toolbar with button groups">
+    <form class="form-inline mt-2 mt-md-0" action="{% url 'response_search' %}" method="get">
+      <input name="q" class="form-control mr-sm-2" type="text" placeholder="Search" aria-label="Seach">
+      <a type="button" class="btn btn-outline-danger" href="{% url 'response_search' %}">Clear Search</a>
+    </form>
+    <div class="btn-group" role="group" aria-label="Select View">
+      <a type="button" href="{% url 'response_search' %}?q={{ request.GET.q|urlencode }}" class="btn btn-outline-secondary">All</a>
+      <a type="button" href="{% url 'response_search' %}?hourfilter=24&q={{ request.GET.q|urlencode }}" class="btn btn-outline-secondary">Last 24 Hours</a>
+      <a type="button" href="{% url 'response_search' %}?hourfilter=48&q={{ request.GET.q|urlencode }}" class="btn btn-outline-secondary">Last 48 Hours</a>
+    </div>
+</div>
+<br>
+<table class="table table-striped table-hover table-bordered">
+    <div class="table-responsive3">
+        <thead>
+        <td>dag_id</td>
+        <td>task_id</td>
+        <td>Action/Error</td>
+        <td>Supporting Notes</td>
+        <td>Investigator</td>
+        <td>Assigned 
+            <button type="button" class="btn btn-outline-dark btn-sm" onClick="hideAssignedRows()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-filter" viewBox="0 0 16 16">
+                    <path d="M6 10.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/>
+                </svg>
+            </button>
+        </td>
+        <td>Remove</td>
+        <td>Details</td>
+
+        </thead>
+        <tbody>
+        {% for post in object_list %}
+        <tr id="row_{{post.issue_id}}">
+            <td><button type="button" class="btn btn-link" id='primary_{{post.id}}' onclick="openDagId('{{post.dag_id}}', '{{post.run_id}}');">
+                {{post.dag_id}}
+              </button></td>
+            <td>{{post.task_id}}</td>
+            <td>
+                <form action="" method="post">{% csrf_token %}
+                    <select 
+                    class="form-control" 
+                    id='action_error_{{post.issue_id}}' 
+                    onChange="updateAction(
+                      '{{post.issue_id}}', 
+                      this.value);">
+                      <option value="" disabled selected></option>
+                    </select>
+                  </form>
+            </td>
+            <td>
+                <textarea type="button" id="text_{{post.issue_id}}" class="form-control" data-toggle="modal" data-target="#modal_{{post.issue_id}}" readonly>{{post.support_notes |truncatechars:30 }}</textarea>
+                <div class="modal fade" id="modal_{{post.issue_id}}" tabindex="-1" role="dialog" aria-labelledby="modal_label_{{post.issue_id}}" aria-hidden="true">
+                    <div class="modal-dialog" role="document">
+                      <div class="modal-content">
+                        <div class="modal-header">
+                          <h5 class="modal-title" id="modal_label_{{post.issue_id}}">{{post.dag_id}}</h5>
+                          <button type="button" class="close" onclick="clearOutAlert('{{post.issue_id}}')" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                          </button>
+                        </div>
+                        <div class="modal-body">
+                            <textarea id="modal_text_{{post.issue_id}}" class="form-control">{{post.support_notes}}</textarea>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary"  onclick="clearOutAlert('{{post.issue_id}}')" data-dismiss="modal">Close</button>
+                          <button type="button" class="btn btn-primary" onclick="updateSupportNotes('{{post.issue_id}}','modal_text_{{post.issue_id}}', '{{ csrf_token }}');" data-dismiss="modal">Save changes</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+            </td>
+            <td>
+                <div id="investigate_{{post.issue_id}}">
+                    <select 
+                    class="form-control" 
+                    id='form_assignee_{{post.issue_id}}'  
+                    onChange="updateAssignee(
+                        '{{post.issue_id}}', 
+                        this.value, 
+                        '{{post.dag_id}}', 
+                        '{{post.task_id}}',
+                        '{{user.username}}',
+                        '{{ csrf_token }}');">
+                    <option value="" disabled selected></option>
+                    </select>
+                </div>
+            </td>
+            <td>
+                <div class="custom-control custom-switch">
+                    <input type="checkbox" class="custom-control-input" id="switch_{{post.issue_id}}" disabled>
+                    <label class="custom-control-label" for="switch_{{post.issue_id}}"></label>
+                </div>
+            </td>
+            <td>
+                <button id="remove_response_{{post.issue_id}}" type="button" class="btn btn-outline-danger" onclick="removeResponse('{{post.issue_id}}', '{{ csrf_token }}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-square-fill" viewBox="0 0 16 16">
+                        <path d="M2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2zm3.354 4.646L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 1 1 .708-.708z"/>
+                    </svg>
+                </button>
+            </td>
+            <td>
+                <button
+                    type="button" 
+                    class="btn btn-outline-info" 
+                    onclick="upsertNote(
+                        '{{post.issue_id}}',
+                        '{{post.dag_id}}', 
+                        '{{post.task_id}}',
+                        '{{user.username}}',
+                        '{{ csrf_token }}');">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-forward-fill" viewBox="0 0 16 16">
+                        <path d="M9.77 12.11l4.012-2.953a.647.647 0 0 0 0-1.114L9.771 5.09a.644.644 0 0 0-.971.557V6.65H2v3.9h6.8v1.003c0 .505.545.808.97.557z"/>
+                    </svg>
+                </button>
+            </td>
+            <span style="display: none;" id="span_dag_start_{{post.issue_id}}">{{post.dag_start_datetime|date:"c" }}</span>
+            <span style="display: none;" id="span_etl_{{post.issue_id}}">{{post.etl_ingestion_time|date:"c" }}</span>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </div>
+  </table>
+  <div class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+            <a href="?page=1">&laquo; first</a>
+            <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+        {% endif %}
+    </span> 
+  </div>
+{% endblock content %}
